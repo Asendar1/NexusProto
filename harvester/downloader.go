@@ -12,7 +12,15 @@ import (
 type Worker struct {
 }
 
-func StartRecrusiveDownload(URL string, totalSize *atomic.Int64) error {
+// TEST map to keep track of visited URLs
+var visitedURLs = make(map[string]bool)
+
+func StartRecursiveDownload(URL string, totalSize *atomic.Int64) error {
+    if visitedURLs[URL] {
+        return nil // already visited
+    }
+    visitedURLs[URL] = true
+    fmt.Println(URL)
 	res, err := http.Get(URL)
 	if err != nil {
 		return fmt.Errorf("Error: %v\n\n", err)
@@ -23,15 +31,36 @@ func StartRecrusiveDownload(URL string, totalSize *atomic.Int64) error {
 		return fmt.Errorf("Status code error: %d %s", res.StatusCode, res.Status)
 	}
 
+	baseHost := res.Request.URL.Host
+
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return fmt.Errorf("Error loading HTTP response body: %v", err)
 	}
 
-	// TODO : add number total number of matches found
-	doc.Find("pre").Each(func(i int, s *goquery.Selection) {
+	// TODO : add number total number of matches found (also respect robots.txt)
+	doc.Find("style, nav, footer, script, img, video, header, aside").Each(func(i int, s *goquery.Selection) {
+		s.Remove()
+	})
+
+	doc.Find("div").Each(func(i int, s *goquery.Selection) {
 		downloadAndSave(i, s, totalSize)
 	})
+
+	doc.Find("a").Each(func(i int, s *goquery.Selection) {
+		// First check domain
+		href, exists := s.Attr("href")
+		if exists {
+			link, err := http.NewRequest("GET", href, nil)
+			if err == nil && link.URL.Host == baseHost {
+				StartRecursiveDownload(link.URL.String(), totalSize)
+			}
+		} else {
+			// TODO: i want to add rejected counter here later
+			return
+		}
+	})
+
 
 	return nil
 }

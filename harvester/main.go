@@ -24,8 +24,8 @@ func main() {
 		}
 		// start the download process
 		totalSize := atomic.Int64{}
-		err = StartRecrusiveDownload(URL, &totalSize)
-		fmt.Printf("\nDownload completed! Total size: %.2f MB\n\n", float64(totalSize.Load()) / 2e25)
+		err = StartRecursiveDownload(URL, &totalSize)
+		fmt.Printf("\nDownload completed! Total size: %.2f MB\n\n", float64(totalSize.Load()) / (1024*1024))
 	}
 	// If programs enter this point, either user exited or an error occurred
 }
