@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync/atomic"
 )
 
 func main() {
@@ -22,15 +23,9 @@ func main() {
 			continue
 		}
 		// start the download process
-		// ? Start with seeing how much there is (number of pages)
-		totalSize, sizeOfPage, err := GetDocSize(URL)
-		if err != nil {
-			fmt.Printf("Error getting document size: %v\n\n", err)
-			continue
-		}
-		// ! DEBUG PRINT
-		fmt.Printf("Document Size: %d bytes\nPage Size: %d bytes\n", totalSize, sizeOfPage)
-
+		totalSize := atomic.Int64{}
+		err = StartRecrusiveDownload(URL, &totalSize)
+		fmt.Printf("\nDownload completed! Total size: %.2f MB\n\n", float64(totalSize.Load()) / 2e25)
 	}
 	// If programs enter this point, either user exited or an error occurred
 }

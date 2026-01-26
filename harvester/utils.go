@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 )
 
 func Intro() {
@@ -16,17 +15,4 @@ func TakeInput() (string, error) {
 	fmt.Print("Enter DOC URL: ")
 	_, err := fmt.Scanln(&URL)
 	return URL, err
-}
-
-func GetDocSize(URL string) (int, int, error) {
-	resp, _ := http.Get(URL)
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return 0, 0, fmt.Errorf("failed to fetch URL: %s", resp.Status)
-	}
-	baseHost := resp.Request.URL.Host
-	// recursive and fetch size (Also respect robots.txt later)
-	totalSize := 0
-	sizeOfPage := []int{}
-
 }
