@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"sync/atomic"
+	"time"
 )
 
 func main() {
@@ -15,17 +16,12 @@ func main() {
 			break
 		}
 
-		// validate the url
-		_, err = http.Get(URL)
-		if err != nil {
-			fmt.Printf("Invalid URL: %v\n\n", err)
-			fmt.Println("Make sure to copy the WHOLE URL, even with the https")
-			continue
-		}
 		// start the download process
 		totalSize := atomic.Int64{}
-		err = StartRecursiveDownload(URL, &totalSize)
-		fmt.Printf("\nDownload completed! Total size: %.2f MB\n\n", float64(totalSize.Load()) / (1024*1024))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		err = StartRecursiveDownload(ctx, URL, &totalSize)
+		cancel()
+		fmt.Printf("\nDownload completed! Total size: %.2f MB\n\n", float64(totalSize.Load())/(1024*1024))
 	}
 	// If programs enter this point, either user exited or an error occurred
 }

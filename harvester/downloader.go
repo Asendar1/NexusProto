@@ -1,29 +1,27 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
-type Worker struct {
-}
+func StartRecursiveDownload(ctx context.Context, URL string, totalSize *atomic.Int64) error {
 
-// TEST map to keep track of visited URLs
-var visitedURLs = make(map[string]bool)
-
-func StartRecursiveDownload(URL string, totalSize *atomic.Int64) error {
-    if visitedURLs[URL] {
-        return nil // already visited
-    }
-    visitedURLs[URL] = true
-    fmt.Println(URL)
-	res, err := http.Get(URL)
+	req, err := http.NewRequestWithContext(ctx, "GET", URL, nil)
 	if err != nil {
 		return fmt.Errorf("Error: %v\n\n", err)
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("Error fetching URL: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -31,43 +29,49 @@ func StartRecursiveDownload(URL string, totalSize *atomic.Int64) error {
 		return fmt.Errorf("Status code error: %d %s", res.StatusCode, res.Status)
 	}
 
-	baseHost := res.Request.URL.Host
-
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return fmt.Errorf("Error loading HTTP response body: %v", err)
 	}
 
-	// TODO : add number total number of matches found (also respect robots.txt)
-	doc.Find("style, nav, footer, script, img, video, header, aside").Each(func(i int, s *goquery.Selection) {
-		s.Remove()
-	})
+	doc.Find("style, nav, footer, script, img, video, header, aside").Remove()
 
-	doc.Find("div").Each(func(i int, s *goquery.Selection) {
+	doc.Find("body").Each(func(i int, s *goquery.Selection) {
 		downloadAndSave(i, s, totalSize)
 	})
-
-	doc.Find("a").Each(func(i int, s *goquery.Selection) {
-		// First check domain
-		href, exists := s.Attr("href")
-		if exists {
-			link, err := http.NewRequest("GET", href, nil)
-			if err == nil && link.URL.Host == baseHost {
-				StartRecursiveDownload(link.URL.String(), totalSize)
-			}
-		} else {
-			// TODO: i want to add rejected counter here later
-			return
-		}
-	})
-
-
 	return nil
 }
 
 func downloadAndSave(i int, s *goquery.Selection, totalSize *atomic.Int64) {
-	text := s.Text()
-	file, err := os.Create(fmt.Sprintf("data/page_%d.txt", i))
+
+	var sb strings.Builder
+
+	// Iterate over semantic elements to preserve structure
+	s.Find("h1, h2, h3, p, pre, li, blockquote").Each(func(j int, el *goquery.Selection) {
+		cleanText := strings.TrimSpace(el.Text())
+		if len(cleanText) > 0 {
+			sb.WriteString(cleanText)
+			sb.WriteString("\n")
+		}
+	})
+
+	text := sb.String()
+	if len(text) == 0 {
+		return
+	}
+
+	hashName := sha256.Sum256([]byte(text))
+	hashString := hex.EncodeToString(hashName[:])
+
+	if _, err := os.Stat("data"); os.IsNotExist(err) {
+		err := os.Mkdir("data", 0755)
+		if err != nil {
+			fmt.Printf("Error creating directory: %v\n", err)
+			return
+		}
+	}
+
+	file, err := os.Create(fmt.Sprintf("data/page_%s.txt", hashString))
 	if err != nil {
 		fmt.Printf("Error creating file: %v\n", err)
 		return
