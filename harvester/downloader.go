@@ -19,6 +19,7 @@ func StartRecursiveDownload(ctx context.Context, URL string, totalSize *atomic.I
 	if err != nil {
 		return fmt.Errorf("Error: %v\n\n", err)
 	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("Error fetching URL: %v", err)
